@@ -59,7 +59,7 @@ $ echo "ls" >/home/username/pii/in
 $ cat /home/username/pii/out
 1672704720 Begin buddies
 1672704720 other@remote
-1672704720 End other@remote
+1672704720 End buddies
 ```
 
 Start a conversation with a buddy, creating a new directory for it.
