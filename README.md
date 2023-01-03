@@ -84,13 +84,13 @@ prwx------   1 username username       0 Jan  2 18:04 in
 Send a message to `other@remote`.
 
 ```console
-$ echo "hey" >/home/username/pii/other@username/in
+$ echo "hey" >/home/username/pii/other@remote/in
 ```
 
 Log the ongoing conversation with `other@remote`.
 
 ```console
-$ tail -f /home/username/pii/other@username/out
+$ tail -f /home/username/pii/other@remote/out
 1672708134 pii hey
 1672708139 Other Person suh
 ```
