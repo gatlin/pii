@@ -120,6 +120,17 @@ Removes the named buddy from the buddy list.
 
 Start a conversation with the named buddy.
 
+# build and install
+
+This has a dependency on [libpurple][libpurple] and [glib2.0][glib].
+On Debian-based platforms this simply means installing the following packages:
+
+- `libpurple-dev`
+- `libglib2.0-dev`
+
+If this does not work for you or if you have advice for other systems please do
+share.
+
 # See also
 
 [lchat](https://tools.suckless.org/lchat/), a basic console client for this
@@ -134,3 +145,4 @@ chat client.
 
 [libpurple]: https://pidgin.im
 [ii]: https://tools.suckless.org/ii/
+[glib]: https://docs.gtk.org/glib/
