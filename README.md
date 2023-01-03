@@ -58,7 +58,7 @@ Ask the server for a list of buddies.
 $ echo "ls" >/home/username/pii/in
 $ cat /home/username/pii/out
 1672704720 Begin buddies
-1672704720 Begin other@remote
+1672704720 other@remote
 1672704720 End other@remote
 ```
 
@@ -90,7 +90,7 @@ $ echo "hey" >/home/username/pii/other@username/in
 Log the ongoing conversation with `other@remote`.
 
 ```console
-$> tail -f /home/username/pii/other@username/out
+$ tail -f /home/username/pii/other@username/out
 1672708134 pii hey
 1672708139 Other Person suh
 ```
