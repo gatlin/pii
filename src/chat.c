@@ -152,7 +152,7 @@ pii_write_conv (
   time_t mtime
 ) {
   const char *name;
-  char *line;
+  char *line, *outf;
   if (alias && *alias) {
     name = alias;
   }
@@ -162,8 +162,10 @@ pii_write_conv (
   else {
     name = NULL;
   }
+  outf = g_build_path ("/", cfg.workspace, conv->name, "out", NULL);
   line = g_strdup_printf ("%s %s", name, message);
-  pii_client_write_out (line);
+  write_to_file (outf, line);
+  g_free (outf);
   g_free (line);
 }
 
