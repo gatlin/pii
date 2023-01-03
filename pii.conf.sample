@@ -1,0 +1,14 @@
+### You may comment out this section if, for instance, you only want Bonjour
+### chat.
+
+[credentials]
+#username=user@xmppserver.tld
+#password=our_little_secret
+
+[pii]
+# paths can be relative or absolute
+workspace=workspace
+libpurpledata=etc/account
+
+### Uncomment the line below te enable Bonjour service.
+bonjour=true

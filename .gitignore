@@ -1,0 +1,18 @@
+# Ignore build and lib
+build
+lib/*
+etc/account/*
+etc/commands/*
+pii.conf
+
+# Ignore any executables
+bin/*
+
+# allow the folder itself to exist
+!bin/.gitkeep
+
+# Fuck this thing
+.DS_Store
+
+.filter
+
