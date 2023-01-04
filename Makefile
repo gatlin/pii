@@ -22,6 +22,7 @@ INC := -I include
 
 ## Default: build the pii executable.
 pii: $(OBJECTS)
+	@mkdir -p bin
 	@echo " Linking...";
 	@echo " $(CC) $^ -o $(TARGET) $(LIB)"; $(CC) $^ -o $(TARGET) $(LIB)
 
