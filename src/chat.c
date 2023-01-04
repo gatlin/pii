@@ -48,13 +48,6 @@ pii_conv_destroy (Conv *c) {
   c = NULL;
 }
 
-static void
-pii_client_write_out (const char *msg) {
-  gchar *outf = g_build_path ("/", cfg.workspace, "out", NULL);
-  write_to_file (outf, msg);
-  g_free (outf);
-}
-
 /*** GLib event loop hooks. ***/
 #define PURPLE_GLIB_READ_COND  (G_IO_IN | G_IO_HUP | G_IO_ERR)
 #define PURPLE_GLIB_WRITE_COND (G_IO_OUT | G_IO_HUP | G_IO_ERR | G_IO_NVAL)
@@ -153,15 +146,9 @@ pii_write_conv (
 ) {
   const char *name;
   char *line, *outf;
-  if (alias && *alias) {
-    name = alias;
-  }
-  else if (who && *who) {
-    name = who;
-  }
-  else {
-    name = NULL;
-  }
+  if (alias && *alias) { name = alias; }
+  else if (who && *who) { name = who; }
+  else { name = NULL; }
   outf = g_build_path ("/", cfg.workspace, conv->name, "out", NULL);
   line = g_strdup_printf ("%s %s", name, message);
   write_to_file (outf, line);
@@ -173,16 +160,14 @@ pii_write_conv (
 static void
 pii_create_conversation (PurpleConversation *pconv) {
   gchar *convpath = g_build_path ( "/", cfg.workspace, pconv->name, NULL );
-  gchar *outf = g_build_path ("/", cfg.workspace, "out", NULL);
   gchar *convout = g_build_path ("/", convpath, "out", NULL);
   create_dirtree (convpath);
   gchar *msg = g_strdup_printf ("creating conversation: %s", pconv->name);
   write_to_file (convout , "\n");
-  write_to_file (outf, msg);
+  write_to_file (cfg.clientout, msg);
   g_free (msg);
   g_free (convout);
   g_free (convpath);
-  g_free (outf);
 }
 
 static PurpleConversationUiOps pii_conv_uiops =
@@ -224,15 +209,15 @@ process_client_input (const char *input) {
   else if (0 == memcmp (input+start, "ls", 2)) {
     GSList *buddies = purple_find_buddies (account, NULL);
     PurpleBuddy *buddy = NULL;
-    pii_client_write_out ("Begin buddies");
+    write_to_file (cfg.clientout, "Begin buddies");
     while (NULL != buddies) {
       buddy = buddies->data;
       if (NULL != buddy) {
-        pii_client_write_out (buddy->name);
+        write_to_file (cfg.clientout, buddy->name);
       }
       buddies = buddies->next;
     }
-    pii_client_write_out ("End buddies");
+    write_to_file (cfg.clientout, "End buddies");
     g_slist_free (buddies);
   }
   else if (0 == memcmp (input+start, "add", 3)) {
@@ -246,7 +231,7 @@ process_client_input (const char *input) {
     PurpleBuddy *buddy = purple_buddy_new (account, name, NULL);
     purple_blist_add_buddy (buddy, NULL, NULL, NULL);
     char *reply = g_strdup_printf ("added buddy %s", name);
-    pii_client_write_out (reply);
+    write_to_file (cfg.clientout, reply);
     g_free (reply);
     g_free (name);
   }
@@ -264,7 +249,7 @@ process_client_input (const char *input) {
     }
     purple_blist_remove_buddy (buddy);
     char *reply = g_strdup_printf ("removed buddy %s", name);
-    pii_client_write_out (reply);
+    write_to_file (cfg.clientout, reply);
     g_free (reply);
     g_free (name);
   }
@@ -312,13 +297,16 @@ client_destroy_cb (gpointer data) {
   }
 }
 
+/**
+ * Creates both the in and out files for interacting with the client itself.
+ * Also creates the IO watcher for the in pipe.
+ */
 static void
 pii_ui_init (void) {
-  gchar *outf = g_build_path ("/", cfg.workspace, "out", NULL);
   gchar *inpipe = g_build_path ("/", cfg.workspace, "in", NULL);
   purple_conversations_set_ui_ops (&pii_conv_uiops);
   create_dirtree (cfg.workspace);
-  pii_client_write_out ("\n"); // an empty string causes a hang at cleanup
+  write_to_file (cfg.clientout, "\n");
   client_infd = create_input_pipe (inpipe);
   g_io_add_watch_full (
     g_io_channel_unix_new (client_infd),
@@ -328,7 +316,6 @@ pii_ui_init (void) {
     NULL,
     client_destroy_cb
   );
-  g_free (outf);
   g_free (inpipe);
 }
 

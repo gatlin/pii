@@ -46,6 +46,8 @@ load_config (char *config_path, GError **caller_error) {
   cfg.workspace = g_key_file_get_string
     (keyfile, "pii", "workspace", NULL);
 
+  cfg.clientout = g_build_path ("/", cfg.workspace, "out", NULL);
+
   g_key_file_free (keyfile);
   return TRUE;
 }
