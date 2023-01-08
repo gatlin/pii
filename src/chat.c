@@ -146,8 +146,12 @@ pii_write_conv (
 ) {
   const char *name;
   char *line, *outf;
-  if (alias && *alias) { name = alias; }
-  else if (who && *who) { name = who; }
+  if (alias && *alias) {
+    name = alias;
+  }
+  else if (who && *who) {
+    name = who;
+  }
   else { name = NULL; }
   outf = g_build_path ("/", cfg.workspace, conv->name, "out", NULL);
   line = g_strdup_printf ("%s %s", name, message);
@@ -203,6 +207,11 @@ process_client_input (const char *input) {
     while (0 != input[start+len] && ' ' != input[start+len]) { len++; }
     /* copy out the name of the buddy and attempt to start a conversation */
     char *name = g_strndup (input+start, len);
+    /*
+     * TODO
+     * use this "name" (possibly itself renamed) to search the buddy list for
+     * the buddy OR group, and then create a conversation as appropriate.
+     */
     (void) purple_conversation_new (PURPLE_CONV_TYPE_IM, account, name);
     g_free (name);
   }
@@ -213,7 +222,7 @@ process_client_input (const char *input) {
     while (NULL != buddies) {
       buddy = buddies->data;
       if (NULL != buddy) {
-        write_to_file (cfg.clientout, buddy->name);
+        write_to_file (cfg.clientout, buddy->alias);
       }
       buddies = buddies->next;
     }
@@ -284,7 +293,7 @@ client_input_cb (GIOChannel *ch, GIOCondition cond, gpointer data) {
         break;
       }
     default:
-      break;
+      return FALSE;
   }
   return TRUE;
 }
@@ -398,7 +407,6 @@ conv_input_cb (GIOChannel *ch, GIOCondition cond, gpointer data) {
   gsize length, term_pos;
   char *buffer;
   Conv *conv = data;
-  PurpleConvIm *im = purple_conversation_get_im_data (conv->pconv);
   GError *error = NULL;
   GIOStatus status = g_io_channel_read_line
     ( ch,
@@ -410,18 +418,34 @@ conv_input_cb (GIOChannel *ch, GIOCondition cond, gpointer data) {
     g_warning ("Error: %s\n", error->message);
     g_error_free (error);
     g_io_channel_shutdown (ch, TRUE, NULL);
+    pii_conv_destroy (conv);
     return FALSE;
   }
   switch (status) {
     case G_IO_STATUS_NORMAL:
       {
         buffer[strcspn (buffer, "\n")] = 0;
-        purple_conv_im_send (im, buffer);
+        switch (purple_conversation_get_type (conv->pconv)) {
+          case PURPLE_CONV_TYPE_IM:
+            {
+              purple_conv_im_send
+                (purple_conversation_get_im_data (conv->pconv), buffer);
+              break;
+            }
+          case PURPLE_CONV_TYPE_CHAT:
+            {
+              purple_conv_chat_send
+                (purple_conversation_get_chat_data (conv->pconv), buffer);
+              break;
+            }
+          default:
+            g_message ("cannot send to unknown conv type: %s\n",buffer);
+        }
         free (buffer);
         break;
       }
     default:
-      break;
+      return FALSE;
   }
   return TRUE;
 }
@@ -433,18 +457,19 @@ conv_destroy_cb (gpointer data) {
   pii_conv_destroy (c);
 }
 
-
 /* Subscribed to the "conversation-created" libpurple signal. */
 static void
 conversation_created (PurpleConversation *pconv, gpointer data) {
   int infd;
-  gchar *convpath = g_build_path ( "/", cfg.workspace, pconv->name, NULL );
-  gchar *inpipe = g_build_path ("/", convpath, "in", NULL);
+  gchar *convpath, *inpipe;
+  purple_conversation_autoset_title (pconv);
+  convpath = g_build_path ( "/", cfg.workspace, pconv->name, NULL );
+  inpipe = g_build_path ("/", convpath, "in", NULL);
   infd = create_input_pipe (inpipe);
   g_io_add_watch_full (
     g_io_channel_unix_new (infd),
     G_PRIORITY_DEFAULT,
-    G_IO_IN | G_IO_HUP,
+    G_IO_IN | G_IO_HUP | G_IO_NVAL,
     conv_input_cb,
     pii_conv_new (infd, pconv),
     conv_destroy_cb );
@@ -453,8 +478,14 @@ conversation_created (PurpleConversation *pconv, gpointer data) {
 }
 
 static void
+conversation_updated (PurpleConversation *pconv, gpointer data) {
+  g_message ("CONVERSATION %s UPDATED\n", pconv->name);
+}
+
+static void
 connect_to_signals () {
-  static int signed_on_handle, conversation_created_handle;
+  static int signed_on_handle, conversation_created_handle,
+             conversation_updated_handle;
 
   purple_signal_connect (purple_connections_get_handle (),
                          "signed-on", &signed_on_handle,
@@ -463,6 +494,10 @@ connect_to_signals () {
   purple_signal_connect (purple_conversations_get_handle (),
                          "conversation-created", &conversation_created_handle,
                          PURPLE_CALLBACK(conversation_created), NULL);
+
+  purple_signal_connect (purple_conversations_get_handle (),
+                        "conversation-updated", &conversation_updated_handle,
+                        PURPLE_CALLBACK(conversation_updated), NULL);
 }
 
 /*** End signals. ***/
@@ -471,35 +506,26 @@ connect_to_signals () {
 gboolean
 initialize_chat () {
   PurpleSavedStatus *status;
-
   setup_libpurple ();
-
   if (NULL != cfg.protocol) {
-    /* Authenticate with the server */
     account = purple_account_new (cfg.username, cfg.protocol);
     if (NULL != cfg.password) {
       purple_account_set_password (account, cfg.password);
     }
-    purple_account_set_enabled (account, UI_ID, TRUE);
   }
-
   else if (cfg.bonjour_enabled) {
-    /* Also set up a bonjour user because why not */
     g_message ("Using bonjour\n");
     account = purple_account_new ("pii", "prpl-bonjour");
     purple_account_set_alias (account, cfg.username);
-    purple_account_set_enabled (account, UI_ID, TRUE);
   }
-
   else {
     g_error ("No valid account, halting setup.\n");
     return FALSE;
   }
-
+  purple_account_set_enabled (account, UI_ID, TRUE);
   /* Set our status */
   status = purple_savedstatus_new (NULL, PURPLE_STATUS_AVAILABLE);
   purple_savedstatus_activate (status);
-
   connect_to_signals ();
   return TRUE;
 }
