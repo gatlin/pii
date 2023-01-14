@@ -6,7 +6,6 @@
 #include "config.h"
 #include "chat.h"
 
-/* Global values! */
 char *config_path;
 GMainLoop *loop;
 
@@ -18,7 +17,6 @@ handle_term (int sinum) {
   }
 }
 
-/* Acceptable command line options */
 GOptionEntry options[] = {
     { "config", 'c', 0,
       G_OPTION_ARG_STRING, &config_path,
@@ -47,10 +45,9 @@ main (int argc, char *argv[]) {
   signal (SIGCHLD, SIG_IGN);
 #endif
 
-  /* Parse options */
   opt_context = g_option_context_new ("- multi-protocol file-based chat");
   g_option_context_add_main_entries (opt_context, options, NULL);
-  if (!g_option_context_parse (opt_context, &argc, &argv, &error)) {
+  if (! g_option_context_parse (opt_context, &argc, &argv, &error)) {
     g_warning ("Error parsing arguments: %s\n", error->message);
     g_error_free (error);
     error = NULL;

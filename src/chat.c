@@ -21,14 +21,17 @@
 
 /**
  * TODO
- * Maintain a collection of accounts, and create a directory in workspace for
- * each.
- * Commands doing stuff with accounts can simply map a string identifier to
- * their index in the collection and require explicit mention in the command.
+ * Replace with a dynamic array of accounts so this can do multiple accounts.
  */
-PurpleAccount *account;
+static PurpleAccount *account;
 static int client_infd = -1;
 
+/**
+ * When a PurpleConversation is created a FIFO input pipe is created and a
+ * watcher is added to the event loop.
+ * A Conv ties the first two together and is passed as a context value to each
+ * of the watcher's callbacks.
+ */
 typedef struct {
   int infd;
   PurpleConversation *pconv;
@@ -134,7 +137,7 @@ static PurpleEventLoopUiOps glib_eventloops =
 /*** End of the eventloop functions. ***/
 /*** Begin UiOps. ***/
 
-/* Callback which receives messages and logs them. */
+/* Called whenever _any_ new message is added to a conversation. */
 static void
 pii_write_conv (
   PurpleConversation *conv,
@@ -160,7 +163,7 @@ pii_write_conv (
   g_free (line);
 }
 
-/* Callback which creates the directory and out-log for a conversation. */
+/* Called to create the conversation directory and out log. */
 static void
 pii_create_conversation (PurpleConversation *pconv) {
   gchar *convpath = g_build_path ( "/", cfg.workspace, pconv->name, NULL );
@@ -198,6 +201,7 @@ static PurpleConversationUiOps pii_conv_uiops =
 static void
 process_client_input (const char *input) {
   int len = 0, start = 0;
+  /* skip whitespace */
   while (' ' == input[start]) { start++; }
   if (0 == memcmp (input+start, "msg", 3)) {
     start += 3;
@@ -207,12 +211,14 @@ process_client_input (const char *input) {
     while (0 != input[start+len] && ' ' != input[start+len]) { len++; }
     /* copy out the name of the buddy and attempt to start a conversation */
     char *name = g_strndup (input+start, len);
-    /*
-     * TODO
-     * use this "name" (possibly itself renamed) to search the buddy list for
-     * the buddy OR group, and then create a conversation as appropriate.
-     */
-    (void) purple_conversation_new (PURPLE_CONV_TYPE_IM, account, name);
+    PurpleConversationType convType = PURPLE_CONV_TYPE_UNKNOWN;
+    if (NULL != purple_find_buddy (account, name)) {
+      convType = PURPLE_CONV_TYPE_IM;
+    }
+    else if (NULL != purple_blist_find_chat (account, name)) {
+      convType = PURPLE_CONV_TYPE_CHAT;
+    }
+    (void) purple_conversation_new (convType, account, name);
     g_free (name);
   }
   else if (0 == memcmp (input+start, "ls", 2)) {
@@ -293,12 +299,12 @@ client_input_cb (GIOChannel *ch, GIOCondition cond, gpointer data) {
         break;
       }
     default:
-      return FALSE;
+      break;
   }
   return TRUE;
 }
 
-void
+static void
 client_destroy_cb (gpointer data) {
   if (client_infd > -1) {
     destroy_input_pipe (client_infd);
@@ -346,7 +352,7 @@ setup_libpurple () {
   purple_util_set_user_dir (cfg.purple_data);
 
   /* We do not want any debugging for now to keep the noise to a minimum. */
-  purple_debug_set_enabled (FALSE);
+  purple_debug_set_enabled (TRUE);
 
   /* Set the core-uiops, which is used to
    *  - initialize the ui specific preferences.
@@ -445,7 +451,7 @@ conv_input_cb (GIOChannel *ch, GIOCondition cond, gpointer data) {
         break;
       }
     default:
-      return FALSE;
+      break;
   }
   return TRUE;
 }
